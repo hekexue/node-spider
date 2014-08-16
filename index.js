@@ -12,81 +12,70 @@
 /*
 /**/
 var querystring = require('querystring'),
-	debug = require('debug')('scraper:spider'),
+	debug = require('debug')('spider'),
 	cheerio = require('cheerio'),
 	request = require('request'),
 	events = require('events'),
 	_ = require('lodash'),
 	q = require('q');
 
-function Spider(venom) {
+function Spider(options) {
 	var spider = this;
 
-	if ( !_.isObject(venom.engine) )
+	if ( !_.isObject(options.engine) )
 		throw new Error('Engine is missing.');
 	
-	// The engine is the object that provides the urlTemplate, the default params and the scraper function.
-	// The scraper function takes in HTML and returns an object containing:
-	//   @param items - Array: The items scrapped out of the page
-	//   @param more - Boolean: If this is set, the spider will query the next page
-	//
-	this.engine      = venom.engine;
+	this.engine      = options.engine;
+	this.proxy       = options.proxy || null;
+	this.name        = util.random.name();
+	this.counts = { retries: 0, pages: 0, items: 0 };
 
-	// The urlTemplate is an instance of _.template, and its used to build the query strings.
-	// This is overridable
-	this.urlTemplate = venom.urlTemplate || venom.engine.urlTemplate;
+	this.urlTemplate = options.urlTemplate || options.engine.urlTemplate;
 
-	// If proxy is set, the spider will crawl using this proxy
-	this.proxy       = venom.proxy || null;
-
+	if ( !this.urlTemplate ) {
+		this.urlTemplate = function(params) { return params.query };
+		this.urlTemplate.isStatic = true;
+	}
 
 	// Start the spider
 	//
-	spider.name        = util.random.name();
 
-	debug('Starting scraper spider "'+spider.name+'" using engine: ', this.engine.process.name);
+	debug('Starting scraper spider "'+spider.name+'" using engine: ', this.engine.scrapper.name);
 
-	spider.counts = { retries: 0, pages: 0, items: 0 };
 	spider.alive = true;
 	spider.emit('start', spider);
 
-	var params = _.defaults(venom.params, engine.defaults);
+	var target = _.defaults(options.target, engine.defaults);
 
-	spider.move(params);
+	spider.move(target);
 };
 
 // Prototype inheritance - EventEmitter
 //
-// The following events can be emitted from a spider:
-// 'start'     - The spider is initialized
-// 'move'      - The spider start a HTTP request
-// 'data'      - The spider scrape results
-// 'ipBlocked' - Our IP gets rejected from the server (Useful to handle IP changes or else)
-// 'finish'    - The spider finishes
-//
 Spider.prototype = Object.create( events.EventEmitter.prototype );
 
 // Move the spider to an address
-Spider.prototype.move = function moveSpider(params) {
+Spider.prototype.move = function moveSpider(target) {
 	if ( !this.alive ) return;
 	var spider = this;
 
 	// Build the URL
 	var query = {
-		url: spider.urlTemplate(params),
+		url: spider.engine.urlTemplate(target),
 		proxy: spider.proxy,
 	};
 
 	// Do an http request
+	debug('Moving to '+query.url);
 	spider.emit('move', query);
 
 	request(query, function parseHtml(err, res, body) { 
-		spider.parseHtml(err, res, body, params); 
+		spider.parseHtml(err, res, body, target); 
 	});
 };
 
 // Parse the response of an HTTP request 
-Spider.prototype.parseHtml = function htmlParser(err, res, body, params) {
+Spider.prototype.parseHtml = function htmlParser(err, res, body, target) {
 	var spider = this,
 		counts = spider.counts;
 
@@ -94,20 +83,20 @@ Spider.prototype.parseHtml = function htmlParser(err, res, body, params) {
 	if (!err && 200 >= res.statusCode && res.statusCode < 400) {
 		debug('Got OK :)');
 
-		var data = spider.engine.scrape(body);
+		var data = spider.engine.scrapper(body);
 
 		counts.items += data.items.length;
 		data.page    =  ++counts.pages;
 
-		debug('Spider sending data');
+		debug('Sending data.');
 		spider.emit('data', data);
 
-		if ( data.more ) {
-			params.start += params.windowSize;
+		if ( data.more && !spider.urlTemplate.isStatic ) {
+			target.start += target.windowSize;
 
 			spider.moveTimeout = setTimeout( function() {
 				spider.moveTimeout = null;
-				spider.move(params);
+				spider.move(target);
 			}, spider.nextPageDelay);
 
 		} else
@@ -124,7 +113,8 @@ Spider.prototype.parseHtml = function htmlParser(err, res, body, params) {
 		// Our IP probably got blocked.
 		//
 		if ( spider.counts.retries < spider.maxRetries ) {
-			spider.emit('ipBlocked', params, message, spider);
+			debug('Sending ipBlocked');
+			spider.emit('ipBlocked', target, message, spider);
 
 			//spider.eventHandler('ipBlocked').then( function() { spider.move() }, spider.kill );
 		}
@@ -144,6 +134,8 @@ Spider.prototype.kill = function stopSpider(data) {
 	debug(data.code+': '+data.message);
 
 	this.alive = false;
+
+	debug('Sending finish');
 	this.emit('finish', data);
 };
 

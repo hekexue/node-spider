@@ -28,7 +28,7 @@ spider.on('finish', function(data) {
 });
 ```
 
-### How to use
+### API
 
 #### Spider(scraper:Function)
 
@@ -74,8 +74,6 @@ The following options are supported:
 - `headers (String) (optional)` The headers to be sent as part of the spider's requests.
 - `maxRetries (Number) (default: 100)` If our IP is blocked, re-try to scrape the results this amount of times.
 
-
-### API
 
 #### Spider::query(`queryParams`:`Object`)
 

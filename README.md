@@ -1,10 +1,10 @@
-# Spider
+## Spider
 
 [![NPM version](https://badge.fury.io/js/spider-engine.svg)](http://badge.fury.io/js/spider-engine)
 
 Web crawling and scraping engine powered by NodeJS.
 
-## How to use
+### How to use
 
 To create a new spider, you can do:
 

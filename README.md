@@ -10,9 +10,9 @@ To create a new spider, you can do:
 
 ```js
 var Spider = require('spider-engine');
-var spider = new Spider(`scraper` || `options`);
+var spider = new Spider(scraper || options);
 
-spider.query(`queryParams`);
+spider.query(params);
 ```
 
 The spider is an `EventEmitter`, so you can get the scraped results as they come in, by doing:

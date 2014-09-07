@@ -102,7 +102,7 @@ Spider inherits from `EventEmitter`, so the following events can be emitted from
 - `start` - The spider has started.
 - `move` - The spider started a HTTP request
 - `data` - The spider scraped and returned results
-- `ipBlocked` - Our IP gets rejected from the server (Useful for logging, or to handle IP changes. Just saying.)
+- `ipBlocked` - Our IP gets rejected from the server (Useful for logging, or to handle IP changes)
 - `finish` - The spider has finished.
 
 
